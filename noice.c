@@ -68,6 +68,9 @@ enum action {
     SEL_DELETE,
     SEL_MOVE,
     SEL_COPY,
+    SET_SELECTED,
+    SEL_ALL,
+    SEL_NONE,
     SEL_RENAME,
 };
 
@@ -82,10 +85,11 @@ struct key {
 #include "config.h"
 
 struct entry {
-	char *name;
-	mode_t mode;
-	time_t t;
-	unsigned long size;
+    char *name;
+    mode_t mode;
+    time_t t;
+    unsigned long size;
+    int selected; 
 };
 
 /* Global context */
@@ -533,10 +537,11 @@ void
 printent(struct entry *ent, int active)
 {
     char *name, *size;
-    unsigned int maxlen = COLS - strlen(CURSR) - 17;
+    unsigned int maxlen = COLS - strlen(CURSR) - 18; // leave space for marker
     char cm = 0;
     int row, col;
     int color;
+    char mark;
 
     getyx(stdscr, row, col);
 
@@ -550,7 +555,10 @@ printent(struct entry *ent, int active)
 
     /* determine color */
     color = filecolor(ent);
-    
+
+    /* determine selection marker */
+    mark = ent->selected ? '+' : ' ';
+
     if (usecolor) {
         if (active)
             attron(A_REVERSE | COLOR_PAIR(color));
@@ -561,11 +569,11 @@ printent(struct entry *ent, int active)
             attron(A_REVERSE);
     }
 
-    /* print filename */
+    /* print filename with marker */
     if (cm == 0)
-        mvprintw(row, 0, "%s%s", active ? CURSR : EMPTY, name);
+        mvprintw(row, 0, "%c%s%s", mark, active ? CURSR : EMPTY, name);
     else
-        mvprintw(row, 0, "%s%s%c", active ? CURSR : EMPTY, name, cm);
+        mvprintw(row, 0, "%c%s%s%c", mark, active ? CURSR : EMPTY, name, cm);
 
     /* turn off color */
     if (active)
@@ -617,6 +625,8 @@ dentfill(char *path, struct entry **dents,
 		(*dents)[n].mode = sb.st_mode;
 		(*dents)[n].t = sb.st_mtime;
 		(*dents)[n].size = sb.st_size;
+
+        (*dents)[n].selected = 0;
 
 		if (filemode(sb.st_mode) == 0 | filemode(sb.st_mode) == '*')
 			totalsize += sb.st_size;
@@ -1044,85 +1054,126 @@ moretyping:
 
         /*Added DELETE*/
         case SEL_DELETE: {
-            char *target, *confirm;
-            if (n == 0)
-                goto nochange;
-            target = mkpath(path, dents[cur].name);
-            printprompt("delete? (y/N): ");
+            char *confirm;
+            int any_selected = 0;
+            for (int i = 0; i < n; i++)
+                if (dents[i].selected)
+                    any_selected = 1;
+            if (!any_selected) {
+                printmsg("No files selected");
+                break;
+            }
+            printprompt("delete selected? (y/N): ");
             confirm = readln();
-            if (confirm == NULL || strcmp(confirm, "y") != 0) {
+            if (!confirm || strcmp(confirm, "y") != 0) {
                 free(confirm);
-                free(target);
-                goto nochange;
+                break;
             }
             free(confirm);
-            if (rmrf(target) < 0)
-                printwarn();
-            free(target);
-            goto begin;
+            for (int i = 0; i < n; i++) {
+                if (dents[i].selected) {
+                    char *target = mkpath(path, dents[i].name);
+                    if (rmrf(target) < 0)
+                        printwarn();
+                    free(target);
+                }
+            }
+            goto begin;  // repopulate directory after deletion
         }
+
+        case SET_SELECTED:
+            dents[cur].selected = !dents[cur].selected;
+            redraw();  // just update the screen, don't reload the directory
+            break;
+
+        case SEL_ALL:
+            for (int i = 0; i < n; i++)
+                dents[i].selected = 1;
+            redraw();
+            break;
+        
+        case SEL_NONE:
+            for (int i = 0; i < n; i++)
+                dents[i].selected = 0;
+            redraw();
+            break;
 
         /*Added MOVE*/
         case SEL_MOVE: {
-            char *src, *dest, *tmp;
-            if (n == 0)
-                goto nochange;
-            src = mkpath(path, dents[cur].name);
+            char *dest_path, *tmp;
+            int any_selected = 0;
+            for (int i = 0; i < n; i++)
+                if (dents[i].selected)
+                    any_selected = 1;
+            if (!any_selected) {
+                printmsg("No files selected");
+                break;
+            }
             printprompt("move to: ");
             tmp = readln();
-            if (tmp == NULL) {
-                free(src);
-                clearprompt();
-                goto nochange;
-            }
-            dest = resolve_dest(path, tmp, dents[cur].name);
+            if (!tmp)
+                break;
+            dest_path = expandpath(tmp);
             free(tmp);
-            if (rename(src, dest) < 0)
-                printwarn();
-            free(src);
-            free(dest);
+            for (int i = 0; i < n; i++) {
+                if (!dents[i].selected)
+                    continue;
+                char *src = mkpath(path, dents[i].name);
+                char *dst = resolve_dest(path, dest_path, dents[i].name);
+                if (rename(src, dst) < 0)
+                    printwarn();
+                free(src);
+                free(dst);
+            }
+            free(dest_path);
             goto begin;
         }
 
         /*Added COPY*/
         case SEL_COPY: {
-            char *src, *dest, *tmp;
-            int in, out;
-            ssize_t nread;
-            char buf[8192];
-            if (n == 0)
-                goto nochange;
-            src = mkpath(path, dents[cur].name);
+            char *dest_path, *tmp;
+            int any_selected = 0;
+            for (int i = 0; i < n; i++)
+                if (dents[i].selected)
+                    any_selected = 1;
+            if (!any_selected) {
+                printmsg("No files selected");
+                break;
+            }
             printprompt("copy to: ");
             tmp = readln();
-            if (tmp == NULL) {
-                free(src);
-                clearprompt();
-                goto nochange;
-            }
-            dest = resolve_dest(path, tmp, dents[cur].name);
+            if (!tmp)
+                break;
+            dest_path = expandpath(tmp);
             free(tmp);
-            in = open(src, O_RDONLY);
-            if (in < 0) {
-                printwarn();
-                free(src);
-                free(dest);
-                goto nochange;
-            }
-            out = open(dest, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            if (out < 0) {
+            for (int i = 0; i < n; i++) {
+                if (!dents[i].selected)
+                    continue;
+                char *src = mkpath(path, dents[i].name);
+                char *dst = resolve_dest(path, dest_path, dents[i].name);
+                int in = open(src, O_RDONLY);
+                if (in < 0) {
+                    printwarn();
+                    free(src); free(dst);
+                    continue;
+                }
+                int out = open(dst, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                if (out < 0) {
+                    close(in);
+                    printwarn();
+                    free(src); free(dst);
+                    continue;
+                }
+                char buf[8192];
+                ssize_t nread;
+                while ((nread = read(in, buf, sizeof(buf))) > 0)
+                    write(out, buf, nread);
                 close(in);
-                printwarn();
+                close(out);
                 free(src);
-                free(dest);
-                goto nochange;
+                free(dst);
             }
-            while ((nread = read(in, buf, sizeof(buf))) > 0)
-                write(out, buf, nread);
-            close(in);
-            close(out);
-            free(src);
-            free(dest);
+            free(dest_path);
             goto begin;
         }
 

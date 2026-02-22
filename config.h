@@ -12,7 +12,7 @@ char *idlecmd = "rain"; /* The screensaver program */
 
 struct assoc assocs[] = {
 	{ "\\.(avi|mp4|mkv|mp3|ogg|flac|mov)$", "mpv" },
-	{ "\\.(png|jpeg|jpg|gif)$", "sxiv" },
+	{ "\\.(png|jpeg|jpg|gif)$", "qimgv" },
 	{ "\\.(html|svg)$", "firefox" },
 	{ "\\.pdf$", "okular" },
 	{ "\\.sh$", "bash" },
@@ -80,4 +80,7 @@ struct key bindings[] = {
 	{ 'x',            SEL_MOVE },
 	{ 'd',            SEL_DELETE },
 	{ 'r',            SEL_RENAME },
+	{ 'A',            SEL_ALL },
+	{ 'U',            SEL_NONE },
+	{ ' ',            SET_SELECTED },
 };

@@ -68,6 +68,7 @@ enum action {
     SEL_DELETE,
     SEL_MOVE,
     SEL_COPY,
+    SEL_RENAME,
 };
 
 struct key {
@@ -1049,6 +1050,27 @@ moretyping:
                 write(out, buf, nread);
             close(in);
             close(out);
+            free(src);
+            free(dest);
+            goto begin;
+        }
+
+        case SEL_RENAME: {
+            char *src, *dest, *tmp;
+            if (n == 0)
+                goto nochange;
+            src = mkpath(path, dents[cur].name);
+            printprompt("rename to: ");
+            tmp = readln();
+            if (tmp == NULL) {
+                free(src);
+                clearprompt();
+                goto nochange;
+            }
+            dest = resolve_dest(path, tmp, NULL); /* no auto append */
+            free(tmp);
+            if (rename(src, dest) < 0)
+                printwarn();
             free(src);
             free(dest);
             goto begin;

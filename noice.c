@@ -65,9 +65,9 @@ enum action {
 	SEL_RUN,
 	SEL_RUNARG,
 	SEL_TOGGLEDOT,
-    SEL_COPY,
-    SEL_MOVE,
     SEL_DELETE,
+    SEL_MOVE,
+    SEL_COPY,
 };
 
 struct key {
@@ -970,110 +970,89 @@ moretyping:
 			DPRINTF_S(path);
 			goto begin;
 
-            case SEL_DELETE: {
-    char *target, *confirm;
+        /*Added DELETE*/
+        case SEL_DELETE: {
+            char *target, *confirm;
+            if (n == 0)
+                goto nochange;
+            target = mkpath(path, dents[cur].name);
+            printprompt("delete? (y/N): ");
+            confirm = readln();
+            if (confirm == NULL || strcmp(confirm, "y") != 0) {
+                free(confirm);
+                free(target);
+                goto nochange;
+            }
+            free(confirm);
+            if (rmrf(target) < 0)
+                printwarn();
+            free(target);
+            goto begin;
+        }
 
-    if (n == 0)
-        goto nochange;
+        /*Added MOVE*/
+        case SEL_MOVE: {
+            char *src, *dest, *tmp;
+            if (n == 0)
+                goto nochange;
+            src = mkpath(path, dents[cur].name);
+            printprompt("move to: ");
+            tmp = readln();
+            if (tmp == NULL) {
+                free(src);
+                clearprompt();
+                goto nochange;
+            }
+            dest = resolve_dest(path, tmp, dents[cur].name);
+            free(tmp);
+            if (rename(src, dest) < 0)
+                printwarn();
+            free(src);
+            free(dest);
+            goto begin;
+        }
 
-    target = mkpath(path, dents[cur].name);
-
-    printprompt("delete? (y/N): ");
-    confirm = readln();
-
-    if (confirm == NULL || strcmp(confirm, "y") != 0) {
-        free(confirm);
-        free(target);
-        goto nochange;
-    }
-
-    free(confirm);
-
-    if (rmrf(target) < 0)
-        printwarn();
-
-    free(target);
-
-    goto begin;
-}
-            case SEL_MOVE: {
-    char *src, *dest, *tmp;
-
-    if (n == 0)
-        goto nochange;
-
-    src = mkpath(path, dents[cur].name);
-
-    printprompt("move to: ");
-    tmp = readln();
-    if (tmp == NULL) {
-        free(src);
-        clearprompt();
-        goto nochange;
-    }
-
-    dest = resolve_dest(path, tmp, dents[cur].name);
-    free(tmp);
-
-    if (rename(src, dest) < 0)
-        printwarn();
-
-    free(src);
-    free(dest);
-
-    goto begin;
-}
-
-case SEL_COPY: {
-    char *src, *dest, *tmp;
-    int in, out;
-    ssize_t nread;
-    char buf[8192];
-
-    if (n == 0)
-        goto nochange;
-
-    src = mkpath(path, dents[cur].name);
-
-    printprompt("copy to: ");
-    tmp = readln();
-    if (tmp == NULL) {
-        free(src);
-        clearprompt();
-        goto nochange;
-    }
-
-    dest = resolve_dest(path, tmp, dents[cur].name);
-    free(tmp);
-
-    in = open(src, O_RDONLY);
-    if (in < 0) {
-        printwarn();
-        free(src);
-        free(dest);
-        goto nochange;
-    }
-
-    out = open(dest, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (out < 0) {
-        close(in);
-        printwarn();
-        free(src);
-        free(dest);
-        goto nochange;
-    }
-
-    while ((nread = read(in, buf, sizeof(buf))) > 0)
-        write(out, buf, nread);
-
-    close(in);
-    close(out);
-
-    free(src);
-    free(dest);
-
-    goto begin;
-}
+        /*Added COPY*/
+        case SEL_COPY: {
+            char *src, *dest, *tmp;
+            int in, out;
+            ssize_t nread;
+            char buf[8192];
+            if (n == 0)
+                goto nochange;
+            src = mkpath(path, dents[cur].name);
+            printprompt("copy to: ");
+            tmp = readln();
+            if (tmp == NULL) {
+                free(src);
+                clearprompt();
+                goto nochange;
+            }
+            dest = resolve_dest(path, tmp, dents[cur].name);
+            free(tmp);
+            in = open(src, O_RDONLY);
+            if (in < 0) {
+                printwarn();
+                free(src);
+                free(dest);
+                goto nochange;
+            }
+            out = open(dest, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (out < 0) {
+                close(in);
+                printwarn();
+                free(src);
+                free(dest);
+                goto nochange;
+            }
+            while ((nread = read(in, buf, sizeof(buf))) > 0)
+                write(out, buf, nread);
+            close(in);
+            close(out);
+            free(src);
+            free(dest);
+            goto begin;
+        }
 
 		case SEL_CDHOME:
 			tmp = getenv("HOME");

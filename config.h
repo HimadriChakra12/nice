@@ -8,11 +8,11 @@ int idletimeout = 0; /* Screensaver timeout in seconds, 0 to disable */
 char *idlecmd = "rain"; /* The screensaver program */
 
 struct assoc assocs[] = {
-	{ "\\.(avi|mp4|mkv|mp3|ogg|flac|mov)$", "mplayer" },
-	{ "\\.(png|jpg|gif)$", "feh" },
+	{ "\\.(avi|mp4|mkv|mp3|ogg|flac|mov)$", "mpv" },
+	{ "\\.(png|jpeg|jpg|gif)$", "sxiv" },
 	{ "\\.(html|svg)$", "firefox" },
-	{ "\\.pdf$", "mupdf" },
-	{ "\\.sh$", "sh" },
+	{ "\\.pdf$", "okular" },
+	{ "\\.sh$", "bash" },
 	{ ".", "less" },
 };
 
@@ -30,10 +30,10 @@ struct key bindings[] = {
 	{ KEY_RIGHT,      SEL_GOIN },
 	{ 'l',            SEL_GOIN },
 	/* Filter */
-	{ '/',            SEL_FLTR },
-	{ '&',            SEL_FLTR },
+//	{ '/',            SEL_FLTR },
+//	{ '&',            SEL_FLTR },
 	/* Filter as you type */
-	{ '?',            SEL_TYPE },
+	{ '/',            SEL_TYPE },
 	/* Next */
 	{ 'j',            SEL_NEXT },
 	{ KEY_DOWN,       SEL_NEXT },
@@ -50,18 +50,18 @@ struct key bindings[] = {
 	{ CONTROL('U'),   SEL_PGUP },
 	/* Home */
 	{ KEY_HOME,       SEL_HOME },
-	{ CONTROL('A'),   SEL_HOME },
+	{ 'g',   SEL_HOME },
 	{ '^',            SEL_HOME },
 	/* End */
 	{ KEY_END,        SEL_END },
-	{ CONTROL('E'),   SEL_END },
+	{ 'G',   SEL_END },
 	{ '$',            SEL_END },
 	/* Change dir */
 	{ 'c',            SEL_CD },
 	{ '#',		  SEL_CDHOME },
 	{ '~',		  SEL_CDHOME },
 	/* Toggle hide .dot files */
-	{ '.',		  SEL_TOGGLEDOT },
+	{ CONTROL('h'),		  SEL_TOGGLEDOT },
 	/* Toggle sort by time */
 	{ 't',            SEL_MTIME },
 	{ CONTROL('L'),   SEL_REDRAW },
@@ -69,7 +69,11 @@ struct key bindings[] = {
 	{ 'z',            SEL_RUN, "top" },
 	{ '!',            SEL_RUN, "sh", "SHELL" },
 	/* Run command with argument */
-	{ 'e',            SEL_RUNARG, "vi", "EDITOR" },
+	{ 'e',            SEL_RUNARG, "nvim", "EDITOR" },
 	{ 'p',            SEL_RUNARG, "less", "PAGER" },
 	{ 'T',		  SEL_RUNARG, "tail", "TAIL", "-f" } , 
+
+	{ 'y',            SEL_COPY },
+	{ 'x',            SEL_MOVE },
+	{ 'd',            SEL_DELETE },
 };

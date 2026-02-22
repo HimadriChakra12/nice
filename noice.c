@@ -65,6 +65,9 @@ enum action {
 	SEL_RUN,
 	SEL_RUNARG,
 	SEL_TOGGLEDOT,
+    SEL_COPY,
+    SEL_MOVE,
+    SEL_DELETE,
 };
 
 struct key {
@@ -688,7 +691,77 @@ redraw(void)
 			printent(&dents[i], i == cur);
 	}
 }
+char *
+expandpath(char *input)
+{
+    char *home, *out;
 
+    if (input[0] != '~')
+        return xstrdup(input);
+
+    home = getenv("HOME");
+    if (!home)
+        return xstrdup(input);
+
+    out = xmalloc(strlen(home) + strlen(input));
+    sprintf(out, "%s%s", home, input + 1);
+    return out;
+}
+
+char *
+resolve_dest(char *basepath, char *input, char *filename)
+{
+    char *expanded = expandpath(input);
+    char *dest;
+
+    if (expanded[0] == '/')
+        dest = xstrdup(expanded);
+    else
+        dest = mkpath(basepath, expanded);
+
+    /* If destination is a directory → append filename */
+    if (canopendir(dest)) {
+        char *tmp = mkpath(dest, filename);
+        free(dest);
+        dest = tmp;
+    }
+
+    free(expanded);
+    return dest;
+}
+
+int
+rmrf(char *path)
+{
+    struct stat sb;
+    DIR *dir;
+    struct dirent *dp;
+    char *newpath;
+
+    if (lstat(path, &sb) < 0)
+        return -1;
+
+    if (S_ISDIR(sb.st_mode)) {
+        dir = opendir(path);
+        if (!dir)
+            return -1;
+
+        while ((dp = readdir(dir)) != NULL) {
+            if (strcmp(dp->d_name, ".") == 0 ||
+                strcmp(dp->d_name, "..") == 0)
+                continue;
+
+            newpath = mkpath(path, dp->d_name);
+            rmrf(newpath);
+            free(newpath);
+        }
+
+        closedir(dir);
+        return rmdir(path);
+    } else {
+        return unlink(path);
+    }
+}
 void
 browse(const char *ipath, const char *ifilter)
 {
@@ -896,6 +969,112 @@ moretyping:
 			fltr = xstrdup(ifilter); /* Reset filter */
 			DPRINTF_S(path);
 			goto begin;
+
+            case SEL_DELETE: {
+    char *target, *confirm;
+
+    if (n == 0)
+        goto nochange;
+
+    target = mkpath(path, dents[cur].name);
+
+    printprompt("delete? (y/N): ");
+    confirm = readln();
+
+    if (confirm == NULL || strcmp(confirm, "y") != 0) {
+        free(confirm);
+        free(target);
+        goto nochange;
+    }
+
+    free(confirm);
+
+    if (rmrf(target) < 0)
+        printwarn();
+
+    free(target);
+
+    goto begin;
+}
+            case SEL_MOVE: {
+    char *src, *dest, *tmp;
+
+    if (n == 0)
+        goto nochange;
+
+    src = mkpath(path, dents[cur].name);
+
+    printprompt("move to: ");
+    tmp = readln();
+    if (tmp == NULL) {
+        free(src);
+        clearprompt();
+        goto nochange;
+    }
+
+    dest = resolve_dest(path, tmp, dents[cur].name);
+    free(tmp);
+
+    if (rename(src, dest) < 0)
+        printwarn();
+
+    free(src);
+    free(dest);
+
+    goto begin;
+}
+
+case SEL_COPY: {
+    char *src, *dest, *tmp;
+    int in, out;
+    ssize_t nread;
+    char buf[8192];
+
+    if (n == 0)
+        goto nochange;
+
+    src = mkpath(path, dents[cur].name);
+
+    printprompt("copy to: ");
+    tmp = readln();
+    if (tmp == NULL) {
+        free(src);
+        clearprompt();
+        goto nochange;
+    }
+
+    dest = resolve_dest(path, tmp, dents[cur].name);
+    free(tmp);
+
+    in = open(src, O_RDONLY);
+    if (in < 0) {
+        printwarn();
+        free(src);
+        free(dest);
+        goto nochange;
+    }
+
+    out = open(dest, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (out < 0) {
+        close(in);
+        printwarn();
+        free(src);
+        free(dest);
+        goto nochange;
+    }
+
+    while ((nread = read(in, buf, sizeof(buf))) > 0)
+        write(out, buf, nread);
+
+    close(in);
+    close(out);
+
+    free(src);
+    free(dest);
+
+    goto begin;
+}
+
 		case SEL_CDHOME:
 			tmp = getenv("HOME");
 			if (tmp == NULL) {

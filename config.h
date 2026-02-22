@@ -3,6 +3,9 @@
 #define CURSR " > "
 #define EMPTY "   "
 
+/* Enable colors */
+static int usecolor = 0;   /* 1 = true, 0 = false */
+
 int mtimeorder = 0; /* Set to 1 to sort by time modified */
 int idletimeout = 0; /* Screensaver timeout in seconds, 0 to disable */
 char *idlecmd = "rain"; /* The screensaver program */
@@ -76,4 +79,5 @@ struct key bindings[] = {
 	{ 'y',            SEL_COPY },
 	{ 'x',            SEL_MOVE },
 	{ 'd',            SEL_DELETE },
+	{ 'r',            SEL_RENAME },
 };

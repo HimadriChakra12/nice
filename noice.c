@@ -281,14 +281,29 @@ entrycmp(const void *va, const void *vb)
 void
 initcurses(void)
 {
-	initscr();
-	cbreak();
-	noecho();
-	nonl();
-	intrflush(stdscr, FALSE);
-	keypad(stdscr, TRUE);
-	curs_set(FALSE); /* Hide cursor */
-	timeout(1000); /* One second */
+    initscr();
+
+    if (usecolor && has_colors()) {
+        start_color();
+        use_default_colors();
+
+        init_pair(1, COLOR_BLUE,    -1); /* dir */
+        init_pair(2, COLOR_GREEN,   -1); /* shell */
+        init_pair(3, COLOR_CYAN,    -1); /* symlink */
+        init_pair(4, COLOR_MAGENTA, -1); /* image */
+        init_pair(5, COLOR_YELLOW,  -1); /* video */
+        init_pair(6, COLOR_WHITE,   -1); /* docs */
+        init_pair(7, COLOR_RED,     -1); /* source */
+        init_pair(8, COLOR_WHITE,   -1); /* default */
+    }
+
+    cbreak();
+    noecho();
+    nonl();
+    intrflush(stdscr, FALSE);
+    keypad(stdscr, TRUE);
+    curs_set(FALSE);
+    timeout(1000);
 }
 
 void
@@ -476,42 +491,98 @@ char filemode(mode_t mod)
 
 	return cm;
 }
+int
+filecolor(struct entry *ent)
+{
+    char *ext = strrchr(ent->name, '.');
+
+    if (S_ISDIR(ent->mode))
+        return 1;
+    if (S_ISLNK(ent->mode))
+        return 3;
+
+    if (ext) {
+        ext++;
+
+        if (!strcmp(ext,"sh")) return 2;
+
+        if (!strcmp(ext,"png") || !strcmp(ext,"jpg") ||
+            !strcmp(ext,"jpeg") || !strcmp(ext,"gif") ||
+            !strcmp(ext,"webp"))
+            return 4;
+
+        if (!strcmp(ext,"mp4") || !strcmp(ext,"mkv") ||
+            !strcmp(ext,"avi") || !strcmp(ext,"mov"))
+            return 5;
+
+        if (!strcmp(ext,"pdf") || !strcmp(ext,"txt") ||
+            !strcmp(ext,"md"))
+            return 6;
+
+        if (!strcmp(ext,"c") || !strcmp(ext,"h") ||
+            !strcmp(ext,"rs")|| !strcmp(ext,"py")||
+            !strcmp(ext,"js")|| !strcmp(ext,"lua")||
+            !strcmp(ext,"go")|| !strcmp(ext,"cpp"))
+            return 7;
+    }
+
+    return 8;
+}
 
 void
 printent(struct entry *ent, int active)
 {
-	char *name, *size;
-	unsigned int maxlen = COLS - strlen(CURSR) - 17;
-	char cm = 0;
-	int row, col;
+    char *name, *size;
+    unsigned int maxlen = COLS - strlen(CURSR) - 17;
+    char cm = 0;
+    int row, col;
+    int color;
 
-	getyx(stdscr, row, col);
+    getyx(stdscr, row, col);
 
-	/* Copy name locally */
-	name = xstrdup(ent->name);
+    name = xstrdup(ent->name);
 
-	if ((cm = filemode(ent->mode)) != 0)
-		maxlen--;
+    if ((cm = filemode(ent->mode)) != 0)
+        maxlen--;
 
-	/* No text wrapping in entries */
-	if (strlen(name) > maxlen)
-		name[maxlen] = '\0';
+    if (strlen(name) > maxlen)
+        name[maxlen] = '\0';
 
-	if (cm == 0)
-		mvprintw(row, 0, "%s%s", active ? CURSR : EMPTY, name);
-	else
-		mvprintw(row, 0, "%s%s%c", active ? CURSR : EMPTY, name, cm);
+    /* determine color */
+    color = filecolor(ent);
+    
+    if (usecolor) {
+        if (active)
+            attron(A_REVERSE | COLOR_PAIR(color));
+        else
+            attron(COLOR_PAIR(color));
+    } else {
+        if (active)
+            attron(A_REVERSE);
+    }
 
-	if (cm == 0 || cm == '*')
-	{
-		size = printsize(ent->size);
-		mvprintw(row, COLS-16, "%s\n", size);
-		free(size);
-	}
-	else
-		printw("\n");
+    /* print filename */
+    if (cm == 0)
+        mvprintw(row, 0, "%s%s", active ? CURSR : EMPTY, name);
+    else
+        mvprintw(row, 0, "%s%s%c", active ? CURSR : EMPTY, name, cm);
 
-	free(name);
+    /* turn off color */
+    if (active)
+        attroff(A_REVERSE | COLOR_PAIR(color));
+    else
+        attroff(COLOR_PAIR(color));
+
+    /* print size column */
+    if (cm == 0 || cm == '*') {
+        size = printsize(ent->size);
+        mvprintw(row, COLS-16, "%s\n", size);
+        free(size);
+    } else {
+        printw("\n");
+    }
+
+    free(name);
 }
 
 int

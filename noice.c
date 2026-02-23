@@ -297,7 +297,7 @@ initcurses(void)
         init_pair(4, COLOR_MAGENTA, -1); /* image */
         init_pair(5, COLOR_YELLOW,  -1); /* video */
         init_pair(6, COLOR_WHITE,   -1); /* docs */
-        init_pair(7, COLOR_RED,     -1); /* source */
+        init_pair(7, COLOR_WHITE,     -1); /* source */
         init_pair(8, COLOR_WHITE,   -1); /* default */
     }
 

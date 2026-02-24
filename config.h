@@ -16,7 +16,7 @@ struct assoc assocs[] = {
 	{ "\\.(html|svg)$", "firefox" },
 	{ "\\.pdf$", "okular" },
 	{ "\\.sh$", "bash" },
-	{ ".", "less" },
+	{ ".", "nvim" },
 };
 
 struct key bindings[] = {
@@ -77,8 +77,11 @@ struct key bindings[] = {
 	{ 'T',		  SEL_RUNARG, "tail", "TAIL", "-f" } , 
 
 	{ 'y',            SEL_COPY },
+	{ 'Y',            CUR_COPY },
 	{ 'x',            SEL_MOVE },
+	{ 'X',            CUR_MOVE },
 	{ 'd',            SEL_DELETE },
+	{ 'D',            CUR_DELETE },
 	{ 'r',            SEL_RENAME },
 	{ 'A',            SEL_ALL },
 	{ 'U',            SEL_NONE },
